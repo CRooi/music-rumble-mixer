@@ -18,6 +18,7 @@ export default () => {
     const [loadingProgress, setLoadingProgress] = useState(0)
     const [playbackState, setPlaybackState] = useState<'stopped' | 'playing' | 'looping'>('stopped')
     const [isBlink, setIsBlink] = useState(true)
+    const [isDownloading, setIsDownloading] = useState(false)
 
     const audioContextRef = useRef<AudioContext | null>(null)
     const audioTracksRef = useRef<Record<string, AudioTrack>>({})
@@ -142,7 +143,6 @@ export default () => {
             }
 
             loopTimeoutRef.current = window.setTimeout(() => {
-                // 停止当前播放的tracks
                 Object.values(audioTracksRef.current).forEach((track) => {
                     if (track.source) {
                         track.source.stop()
@@ -150,14 +150,11 @@ export default () => {
                     }
                 })
                 
-                // 重置开始时间并重新开始播放
                 startTimeRef.current = audioContextRef.current!.currentTime
                 playNewTracks()
                 
-                // 确保播放状态保持为'looping'
                 setPlaybackState('looping')
                 
-                // 安排下一次循环
                 scheduleNextLoop()
             }, timeUntilNextLoop * 1000)
         }
@@ -248,6 +245,98 @@ export default () => {
         )
     }
 
+    const downloadMix = async () => {
+        if (audioContextRef.current && selectedTracks.length > 0) {
+            setIsDownloading(true)
+    
+            const longestDuration = Math.max(...selectedTracks.map(track => 
+                audioTracksRef.current[track].buffer.duration
+            ))
+    
+            const offlineContext = new OfflineAudioContext({
+                numberOfChannels: 2,
+                length: Math.ceil(44100 * longestDuration),
+                sampleRate: 44100,
+            })
+    
+            const sources = await Promise.all(selectedTracks.map(async (track) => {
+                const source = offlineContext.createBufferSource()
+                source.buffer = audioTracksRef.current[track].buffer
+                source.connect(offlineContext.destination)
+                return source
+            }))
+    
+            sources.forEach(source => source.start())
+    
+            const renderedBuffer = await offlineContext.startRendering()
+    
+            const wavBlob = bufferToWave(renderedBuffer, renderedBuffer.length)
+            const url = URL.createObjectURL(wavBlob)
+    
+            const a = document.createElement('a')
+            a.style.display = 'none'
+            a.href = url
+            a.download = 'tft_mix.wav'
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+            URL.revokeObjectURL(url)
+    
+            setIsDownloading(false)
+        }
+    }
+
+    const bufferToWave = (abuffer: AudioBuffer, len: number) => {
+        const numOfChan = abuffer.numberOfChannels
+        const length = len * numOfChan * 2 + 44
+        const buffer = new ArrayBuffer(length)
+        const view = new DataView(buffer)
+        const channels = []
+        let i
+        let sample
+        let offset = 0
+        let pos = 0
+
+        setUint32(0x46464952)
+        setUint32(length - 8)
+        setUint32(0x45564157)
+        setUint32(0x20746d66)
+        setUint32(16)
+        setUint16(1)
+        setUint16(numOfChan)
+        setUint32(abuffer.sampleRate)
+        setUint32(abuffer.sampleRate * 2 * numOfChan)
+        setUint16(numOfChan * 2)
+        setUint16(16)
+        setUint32(0x61746164)
+        setUint32(length - pos - 4)
+
+        for (i = 0; i < abuffer.numberOfChannels; i++)
+            channels.push(abuffer.getChannelData(i))
+
+        while (pos < length) {
+            for (i = 0; i < numOfChan; i++) {
+                sample = Math.max(-1, Math.min(1, channels[i][offset]))
+                sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0
+                view.setInt16(pos, sample, true)
+                pos += 2
+            }
+            offset++
+        }
+
+        return new Blob([buffer], { type: 'audio/wav' })
+
+        function setUint16(data: number) {
+            view.setUint16(pos, data, true)
+            pos += 2
+        }
+
+        function setUint32(data: number) {
+            view.setUint32(pos, data, true)
+            pos += 4
+        }
+    }
+
     if (isLoading) {
         return (
             <div className='min-h-screen flex items-center justify-center'>
@@ -265,7 +354,7 @@ export default () => {
         <div className='p-3'>
             <EuiTitle size='l'><div>云顶之弈：强音争霸 音乐混音器</div></EuiTitle>
             <EuiSpacer size='m' />
-            <div className='grid grid-cols-2 lg:grid-cols-5 gap-3'>
+            <div className='grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3'>
                 <EuiButton 
                     onClick={() => playTracks(false)} 
                     disabled={playbackState !== 'stopped' || selectedTracks.length === 0}
@@ -295,7 +384,13 @@ export default () => {
                 >
                     {isBlink ? '关闭闪烁' : '图标闪烁'}
                 </EuiButton>
-
+                <EuiButton 
+                    onClick={downloadMix} 
+                    disabled={isDownloading || selectedTracks.length === 0}
+                    isLoading={isDownloading}
+                >
+                    下载混音
+                </EuiButton>
             </div>
             <EuiSpacer size='m' />
             <EuiTitle size='m'><div>羁绊</div></EuiTitle>
