@@ -1,16 +1,18 @@
 # Music Rumble Mixer
 
-## Install dependencies
+## Usage
+
+### Install dependencies
 ```
 bun i
 ```
 
-## Run
+### Run
 ```
 bun dev
 ```
 
-## Run
+### Build
 ```
 bun build
 ```
