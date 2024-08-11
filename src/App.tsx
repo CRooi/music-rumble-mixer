@@ -8,7 +8,7 @@ interface AudioTrack {
     startTime: number
 }
 
-export default function App() {
+export default () => {
     const others = ['death', 'piano', 'starting']
     const [isModalVisible, setIsModalVisible] = useState(false)
     const [modalTrait, setModalTrait] = useState('')
@@ -17,6 +17,7 @@ export default function App() {
     const [isLoading, setIsLoading] = useState(true)
     const [loadingProgress, setLoadingProgress] = useState(0)
     const [playbackState, setPlaybackState] = useState<'stopped' | 'playing' | 'looping'>('stopped')
+    const [isBlink, setIsBlink] = useState(true)
 
     const audioContextRef = useRef<AudioContext | null>(null)
     const audioTracksRef = useRef<Record<string, AudioTrack>>({})
@@ -29,7 +30,7 @@ export default function App() {
             <div className='relative'>
                 {isSelected && (
                     <div className='flex items-center justify-center z-10 absolute w-full h-full overflow-hidden'>
-                        <img src={`/icon/${trait}.png`} alt={trait} className='h-full blur-2xl' />
+                        <img src={`/icon/${trait}.png`} alt={trait} className={`h-full blur-2xl ${playbackState === 'playing' || playbackState === 'looping' && isBlink ? (selectedTracks[0].includes('late') ? 'blink-late' : 'blink-early') : ''}`} />
                     </div>
                 )}
                 
@@ -224,6 +225,11 @@ export default function App() {
         return (
             <>
                 {tracks[trait].map((track) => {
+                    if (selectedTracks.length > 0) {
+                        if (selectedTracks[0].includes('early') && track.includes('late')) return null
+                        if (selectedTracks[0].includes('late') && track.includes('early')) return null
+                    }
+
                     return (
                         <EuiCheckbox
                             id={track}
@@ -259,7 +265,7 @@ export default function App() {
         <div className='p-3'>
             <EuiTitle size='l'><div>云顶之弈：强音争霸 音乐混音器</div></EuiTitle>
             <EuiSpacer size='m' />
-            <div className='grid grid-cols-2 lg:grid-cols-4 gap-3'>
+            <div className='grid grid-cols-2 lg:grid-cols-5 gap-3'>
                 <EuiButton 
                     onClick={() => playTracks(false)} 
                     disabled={playbackState !== 'stopped' || selectedTracks.length === 0}
@@ -284,6 +290,12 @@ export default function App() {
                 >
                     清除所有选择
                 </EuiButton>
+                <EuiButton 
+                    onClick={isBlink ? () => setIsBlink(false) : () => setIsBlink(true)} 
+                >
+                    {isBlink ? '关闭闪烁' : '图标闪烁'}
+                </EuiButton>
+
             </div>
             <EuiSpacer size='m' />
             <EuiTitle size='m'><div>羁绊</div></EuiTitle>

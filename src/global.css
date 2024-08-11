@@ -1,3 +1,21 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.blink-early {
+    animation: blink-animation calc(60s / (70 * 2)) infinite alternate;
+}
+
+.blink-late {
+    animation: blink-animation calc(60s / (90 * 2)) infinite alternate;
+}
+
+@keyframes blink-animation {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
