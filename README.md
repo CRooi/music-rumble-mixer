@@ -1,4 +1,4 @@
-# Music Rumble Mixer
+# Rumble Mixer
 
 Mixer of the music in the set 10 (Remix Rumble) of TFT.
 
